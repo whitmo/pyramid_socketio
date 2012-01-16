@@ -1,40 +1,39 @@
-####################
-CHECK OUT THIS POST: http://blog.abourget.net/2011/3/17/new-and-hot-part-4-pyramid-socket-io-gevent/
-####################
+======================================================================
+ Gevent-based Socket.IO integration for Pyramid (and WSGI frameworks)
+======================================================================
+
+The following is a bit rude and rough, `check the blog post instead
+<http://blog.abourget.net/2011/3/17/new-and-hot-part-4-pyramid-socket-io-gevent/>`_
 
 
+To use the server run either::
 
-The following is a bit rude and rough, check the blog post instead
+ $ socketio-serve development.ini
 
-Gevent-based Socket.IO integration for Pyramid (and WSGI frameworks)
-====================================================================
+or::
 
-To use the server, either run:
-
-<pre>
-socketio-serve development.ini
-socketio-serve-reload development.ini
-</pre>
-
-or tweak your <code>[server:main]</code> section in your development.ini to:
-
-<pre>
-[server:main]
-use = egg:pyramid_socketio#sioserver_patched                                                                                     resource = socket.io
-host = 0.0.0.0
-port = 6555
-</pre>
-
-otherwise, follow instructions given for <code>pastegevent</code>.
+ $ socketio-serve-reload development.ini
 
 
-Simple in-Pyramid usage:
+or tweak your `[server:main]` section in your
+development.ini to::
 
-<pre>
-### somewhere in a Pyramid view:
-from pyramid_socketio import SocketIOContext, socketio_manage
+ [server:main]
+ use = egg:pyramid_socketio#sioserver_patched                                                                                     
+ resource = socket.io
+ host = 0.0.0.0
+ port = 6555
 
-class ConnectIOContext(SocketIOContext):
+Otherwise, follow instructions given for `pastegevent`.
+
+
+Simple in-Pyramid usage
+::
+
+ ### somewhere in a Pyramid view:
+ from pyramid_socketio import SocketIOContext, socketio_manage
+
+ class ConnectIOContext(SocketIOContext):
     """Starting context, which will go one side or the other"""
     def msg_connect(self, msg):
         if msg.get('context') not in contexts:
@@ -55,7 +54,7 @@ class ConnectIOContext(SocketIOContext):
         print "Logged in, session created and"
 
 
-class SectionIOContext(SocketIOContext):
+ class SectionIOContext(SocketIOContext):
     def startup(self, connect_msg):
         print "Started the section context"
         self.my_id = connect_msg['section_id']
@@ -123,15 +122,15 @@ class SectionIOContext(SocketIOContext):
     def msg_enter_game(self, msg):
         return self.switch(SomeOtherIOContext)
 
-contexts = {'section': SectionIOContext,
+ contexts = {'section': SectionIOContext,
             'somewhereelse': SocketIOContext,
             }
 
-#
-# SOCKET.IO implementation
-#
-@view_config(route_name="socket_io")
-def socket_io(request):
+ #
+ # SOCKET.IO implementation
+ #
+ @view_config(route_name="socket_io")
+ def socket_io(request):
     """Deal with the SocketIO protocol, using SocketIOContext objects"""
     # Offload management to the pyramid_socketio module
 
@@ -140,31 +139,34 @@ def socket_io(request):
     return Response(retval)
 
 
-#### Inside __init__.py for your Pyramid application:
-def main(..):
+ #### Inside __init__.py for your Pyramid application:
+ def main(..):
     ...
     config.add_static_view('socket.io/lib', 'intr:static')
     config.add_route('socket_io', 'socket.io/*remaining')
-    ....
-</pre>
-
-In the routes and view configurations, 'socket.io' is the "resource" specified either in the server (under [server:main], key=resource), and is by default "socket.io".  This is pretty much a standard..
+    .... 
 
 
 
-#
-#  On the JavaScript side:
-#
+In the routes and view configurations, 'socket.io' is the "resource"
+specified either in the server (under [server:main], key=resource),
+and is by default "socket.io".  This is pretty much a standard..
 
-Somewhere:
+
+
+
+On the JavaScript side
+======================
+
+Somewhere::
 
   <script src="http://cdn.socket.io/stable/socket.io.js"></script>
 
-And then:
+And then::
 
-var socket = new io.Socket(null, {rememberTransport: false,
+ var socket = new io.Socket(null, {rememberTransport: false,
                                   transports: ['websocket', 'xhr-multipart', 'xhr-polling', 'jsonp-polling']});
-socket.on('message', function(obj){
+ socket.on('message', function(obj){
   console.log("message:", JSON.stringify(obj));
   if ((obj.type == "memorized") || (obj.type == "forgot")) {
     // do some tihngs...
@@ -179,37 +181,37 @@ socket.on('message', function(obj){
     $('#intrentry-post-photos div.upload').empty();
     new_upload_box();
   }
-});
-socket.on('error', function(obj) {
+ });
+ socket.on('error', function(obj) {
   console.log("error", obj);
-});
-socket.on('disconnect', function(obj) {
+ });
+ socket.on('disconnect', function(obj) {
   console.log("disconnected", obj);
   socketio_notification("Disconnected", "There was a disconnection, either because of network or server failure");
   socketio_schedule_reconnect();
-});
-var connection_notification = null;
-socket.on('connect', function() {
+ });
+ var connection_notification = null;
+ socket.on('connect', function() {
   console.log("connected");
   // Comment out if you don't use the auto-reconnect machinery:
   socketio_notification();
   socket.send({type: "connect", context: "interest", interest_id: "${intr['_id']}"});
-});
+ });
 
 
 
-// Use this:
+ // Use this:
 
-socket.connect(); 
+ socket.connect(); 
 
 
 
-// Or this is optional auto-reconnect machinery:
+ // Or this is optional auto-reconnect machinery:
 
-function socketio_schedule_reconnect() {
+ function socketio_schedule_reconnect() {
   setTimeout(function() { if (!socket.connected && !socket.connecting) { socketio_reconnect("reconnect");}}, 1000);
-}
-function socketio_reconnect(func) {
+ }
+ function socketio_reconnect(func) {
   console.log("connecting... ", socket);
   if (func == "connect") {
     socketio_notification("Connecting", "Connecting...");
@@ -219,8 +221,8 @@ function socketio_reconnect(func) {
     socketio_schedule_reconnect();
   }
   socket.connect();
-}
-function socketio_notification(title, msg) {
+ } 
+ function socketio_notification(title, msg) {
   if (connection_notification) {
     connection_notification.close();
     connection_notification = null;
@@ -228,7 +230,7 @@ function socketio_notification(title, msg) {
   if (title) {
     connection_notification = notify_default(title, msg);
   }
-}
-$(document).ready(function() {
+ }
+ $(document).ready(function() {
   socketio_reconnect('connect');
-});
+ });
