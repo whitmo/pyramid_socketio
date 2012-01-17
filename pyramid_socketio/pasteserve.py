@@ -1,31 +1,30 @@
-"""Entry point for PasteDeploy."""
-
-# hump'ly ripped from pastegevent 0.1
-
 from gevent import reinit
 from socketio import SocketIOServer
 from gevent.monkey import patch_all
-
-__all__ = ["server_factory",
-           "server_factory_patched"]
+from functools import partial
 
 
-def server_factory(global_conf, host, port, resource="socket.io"):
-    port = int(port)
-    def serve(app):
-        reinit()
-        print "Serving on %s:%d (http://127.0.0.1:%d) ..." % (host, port, port)
-        SocketIOServer((host, port), app,
-                       resource=resource).serve_forever()
-    return serve
+class ServerFactory(object):
+    reinit = staticmethod(reinit)
+    patch_all = staticmethod(partial(patch_all, dns=False))
+    server_factory = SocketIOServer
 
+    def __init__(self, global_conf, host, port, resource="socket.io", namespace='pyramid_socketio', patch=False):
+        self.global_conf = global_conf
+        self.host = host
+        self.port = int(port)
+        self.resource = resource
+        self.namespace = namespace
+        self.patch = patch
 
-def server_factory_patched(global_conf, host, port, resource="socket.io"):
-    port = int(port)
-    def serve(app):
-        reinit()
-        patch_all(dns=False)
-        print "Serving on %s:%d (http://127.0.0.1:%d) ..." % (host, port, port)
-        SocketIOServer((host, port), app,
-                       resource=resource).serve_forever()
-    return serve
+    def serve(self, app):
+        self.reinit()
+        if self.patch is True:
+            self.patch_all()
+        print "Serving on %s:%d (http://127.0.0.1:%d) ..." % (self.host, self.port, self.port)
+        server = self.server_factory((self.host, self.port), app, resource=self.resource, namespace=self.namespace)
+        server.serve_forever()
+
+    __call__ = serve
+
+server_factory_patched = partial(ServerFactory, patch=True)
