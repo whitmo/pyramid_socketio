@@ -1,7 +1,7 @@
-from gevent import reinit
-from socketio import SocketIOServer
-from gevent.monkey import patch_all
 from functools import partial
+from gevent import reinit
+from gevent.monkey import patch_all
+from socketio import SocketIOServer
 
 
 class ServerFactory(object):
