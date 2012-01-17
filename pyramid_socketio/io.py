@@ -17,6 +17,7 @@ class SocketIOKeyAssertError(SocketIOError):
 
 
 class SocketIOContext(object):
+
     def __init__(self, request, in_type="type", out_type="type", debug=False):
         """Called when you create a new context, either by hand or from a
            nested context.
@@ -39,13 +40,20 @@ class SocketIOContext(object):
         self._in_type = in_type
         self._out_type = out_type
         self._on_disconnect = []
-        self.id = self.io.session.session_id
+        self.id = self.session.session_id
         if not hasattr(request, 'jobs'):
             request.jobs = []
 
         # Override self.debug if in production mode
         if not debug:
             self.debug = lambda x: None
+
+    @property
+    def session(self):
+        _session = getattr(self, '__session', None)
+        if _session is None:
+            _session = self.__session = self.io.handler.server.get_session()
+        return _session
 
     def debug(self, msg):
         print "%s: %s" % (self.id, msg)
