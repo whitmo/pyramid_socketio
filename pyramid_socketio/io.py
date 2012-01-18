@@ -1,9 +1,9 @@
 # -=- encoding: utf-8 -=-
-
+from pyramid.response import Response
 import logging
 import gevent
 
-__all__ = ['SocketIOError', 'SocketIOContext', 'socketio_manage']
+__all__ = ['SocketIOError', 'SocketIOContext']
 
 log = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ class SocketIOKeyAssertError(SocketIOError):
 
 
 class SocketIOContext(object):
+    response_class = Response
 
     def __init__(self, request, in_type="type", out_type="type", debug=False):
         """Called when you create a new context, either by hand or from a
@@ -55,6 +56,10 @@ class SocketIOContext(object):
             _session = self.__session = self.io.handler.server.get_session()
         return _session
 
+    @property
+    def connected(self):
+        return self.session.connected
+
     def debug(self, msg):
         print "%s: %s" % (self.id, msg)
 
@@ -86,7 +91,6 @@ class SocketIOContext(object):
         socket gets disconnected for any reasons.
 
         """
-        request = self.request
         io = self.io
         self.request = None
         self.io = None
@@ -147,8 +151,7 @@ class SocketIOContext(object):
     def send(self, msg):
         """Wrapper for self.io.send, to detect any sending problem and
         call the destroy callbacks"""
-        io = self.io
-        if not io.connected():
+        if not self.connected:
             self.kill()
             self.debug("not connected on send(): exiting greenlet")
             raise gevent.GreenletExit()
@@ -181,70 +184,77 @@ class SocketIOContext(object):
         except SocketIOKeyAssertError, e:
             return None
 
+    @classmethod
+    def socketio_manage(cls, start_context):
+        """Main SocketIO management function, call from within your Pyramid view.
 
-def watcher(request):
-    """Watch if any of the greenlets for a request have died. If so, kill the
-       request and the socket.
-    """
-    # TODO: add that if any of the request.jobs die, kill them all and exit
-    io = request.environ['socketio']
-    gevent.sleep(5.0)
-    while True:
-        gevent.sleep(1.0)
-        if not io.connected():
-            # TODO: Warning, what about the on_disconnect callbacks ?
-            gevent.killall(request.jobs)
-            return
+        Pass it an instance of a SocketIOContext or a derivative that will handle
+        messages for a particular context.
+        """
+        request = start_context.request
+        #io = request.environ['socketio']
+
+        #if not start_context.connected:
+        #    # probably asked for something else dude!
+        #    return """Inconcievable. have you mapped socket.io/lib to something"""
+
+        # Run startup if there's one
+        start_context.spawn(cls.socketio_recv, start_context)
+
+        # Launch the watcher thread
+        killall = gevent.spawn(cls.watcher, request)
+
+        gevent.joinall(request.jobs + [killall])
+
+        start_context.debug("socketio_manage terminated")
+
+        return "done"
+
+    @classmethod
+    def socketio_response(cls, request, in_type="type", out_type="type", debug=False):
+        ctx = cls(request, in_type, out_type, debug)
+        return cls.response_class(cls.socketio_manage(ctx))
+
+    @staticmethod
+    def watcher(request):
+        """Watch if any of the greenlets for a request have died. If so, kill the
+        request and the socket.
+        """
+        # TODO: add that if any of the request.jobs die, kill them all and exit
+        io = request.environ['socketio']
+        gevent.sleep(5.0)
+        while True:
+            gevent.sleep(1.0)
+            if not io.handler.server.get_session().connected:
+                # TODO: Warning, what about the on_disconnect callbacks ?
+                gevent.killall(request.jobs)
+                return
+
+    @staticmethod
+    def socketio_recv(context):
+        """Manage messages arriving from Socket.IO, dispatch to context handler"""
+        io = context.io
+        in_type = context._in_type
+        while True:
+            for msg in io.receive():
+                # Skip invalid messages
+                if not isinstance(msg, dict):
+                    context.error("bad_request",
+                                  "Your message needs to be JSON-formatted")
+                elif in_type not in msg:
+                    context.error("bad_request",
+                                  "You need a 'type' attribute in your message")
+                else:
+                    # Call msg in context.
+                    newctx = context(msg)
+
+                    # Switch context ?
+                    if newctx:
+                        context = newctx
+
+            if not context.connected:
+                context.kill()
+                return
 
 
-def socketio_recv(context):
-    """Manage messages arriving from Socket.IO, dispatch to context handler"""
-    io = context.io
-    in_type = context._in_type
-    while True:
-        for msg in io.recv():
-            # Skip invalid messages
-            if not isinstance(msg, dict):
-                context.error("bad_request",
-                              "Your message needs to be JSON-formatted")
-            elif in_type not in msg:
-                context.error("bad_request",
-                              "You need a 'type' attribute in your message")
-            else:
-                # Call msg in context.
-                newctx = context(msg)
 
-                # Switch context ?
-                if newctx:
-                    context = newctx
-
-        if not io.connected():
-            context.kill()
-            return
-
-
-def socketio_manage(start_context):
-    """Main SocketIO management function, call from within your Pyramid view.
-
-    Pass it an instance of a SocketIOContext or a derivative that will handle
-    messages for a particular context.
-    """
-    request = start_context.request
-    io = request.environ['socketio']
-
-    if not io.connected():
-        # probably asked for something else dude!
-        return "there's no reason to get here, you won't get any further. have you mapped socket.io/lib to something ?"
-
-    # Run startup if there's one
-
-    start_context.spawn(socketio_recv, start_context)
-
-    # Launch the watcher thread
-    killall = gevent.spawn(watcher, request)
-
-    gevent.joinall(request.jobs + [killall])
-
-    start_context.debug("socketio_manage terminated")
-
-    return "done"
