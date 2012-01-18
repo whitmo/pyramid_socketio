@@ -39,9 +39,8 @@ setup(name='pyramid_socketio',
       socketio-serve = pyramid_socketio.serve:socketio_serve
 
       [paste.server_factory]
-      sioserver = pyramid_socketio.pasteserve:server_factory
+      sioserver = pyramid_socketio.pasteserve:ServerFactory
       sioserver_patched = pyramid_socketio.pasteserve:server_factory_patched
-
       """,
       )
 
