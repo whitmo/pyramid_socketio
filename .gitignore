@@ -1,3 +1,4 @@
 *~
 *.pyc
-pyramid_socketio.egg-info/
+*.egg-info/
+*flymake*
