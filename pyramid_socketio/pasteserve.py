@@ -8,12 +8,12 @@ class ServerFactory(object):
     patch_all = staticmethod(partial(patch_all, dns=False))
     server_factory = SocketIOServer
 
-    def __init__(self, global_conf, host, port, namespace='socket.io', 
+    def __init__(self, global_conf, host, port, resource='socket.io', 
                  patch=False, flash=True):
         self.global_conf = global_conf
         self.host = host
         self.port = int(port)
-        self.namespace = namespace
+        self.resource = resource
         self.patch = patch
         self.flash = flash
         if isinstance(flash, basestring) \
@@ -28,7 +28,7 @@ class ServerFactory(object):
 
         print "Serving on %s:%d (http://127.0.0.1:%d) ..." % (self.host, self.port, self.port)
         server = self.server_factory((self.host, self.port), app, 
-                                     namespace=self.namespace, 
+                                     resource=self.resource, 
                                      policy_server=self.flash)
         server.serve_forever()
 

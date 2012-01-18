@@ -58,7 +58,7 @@ class SocketIOContext(object):
 
     @property
     def connected(self):
-        return self.session.connected
+        return self.io.connected()
 
     def debug(self, msg):
         print "%s: %s" % (self.id, msg)
@@ -225,7 +225,7 @@ class SocketIOContext(object):
         gevent.sleep(5.0)
         while True:
             gevent.sleep(1.0)
-            if not io.handler.server.get_session().connected:
+            if not io.connected():
                 # TODO: Warning, what about the on_disconnect callbacks ?
                 gevent.killall(request.jobs)
                 return
@@ -236,7 +236,7 @@ class SocketIOContext(object):
         io = context.io
         in_type = context._in_type
         while True:
-            for msg in io.receive():
+            for msg in io.recv():
                 # Skip invalid messages
                 if not isinstance(msg, dict):
                     context.error("bad_request",
