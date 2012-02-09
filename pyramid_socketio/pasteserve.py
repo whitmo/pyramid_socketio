@@ -3,6 +3,7 @@ from gevent import reinit
 from gevent.monkey import patch_all
 from socketio import SocketIOServer
 
+
 class ServerFactory(object):
     reinit = staticmethod(reinit)
     patch_all = staticmethod(partial(patch_all, dns=False))
